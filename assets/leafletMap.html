@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+    />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <style>
+      body,
+      html,
+      #map {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <script>
+      var map = L.map("map", {
+        center: [-7.782794123757193, 110.36709914609082], // Tugu Jogja
+        zoom: 17,
+        zoomControl: false,
+        attributionControl: false,
+      });
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "",
+      }).addTo(map);
+
+      var marker = L.marker([-7.782794123757193, 110.36709914609082])
+        .addTo(map)
+        .bindPopup("Ini Tugu Jogja", marker);
+
+      // Tangkap klik di peta dan kirim ke React Native
+      map.on("click", function (e) {
+        var lat = e.latlng.lat;
+        var lng = e.latlng.lng;
+
+        // Pindahkan marker ke lokasi yang diklik
+        marker
+          .setLatLng([lat, lng])
+          .bindPopup(`Lat: ${lat}, Lng: ${lng}`)
+          .openPopup();
+
+        // Kirim koordinat ke React Native
+        window.ReactNativeWebView.postMessage(JSON.stringify({ lat, lng }));
+      });
+
+      // Tangkap pesan dari React Native untuk mengubah posisi peta
+      window.addEventListener("message", function (event) {
+        var data = JSON.parse(event.data);
+        if (data.type === "SET_LOCATION") {
+          var { lat, lng } = data.payload;
+          map.setView([lat, lng], 13);
+          marker
+            .setLatLng([lat, lng])
+            .bindPopup(`Lat: ${lat}, Lng: ${lng}`)
+            .openPopup();
+        }
+      });
+    </script>
+  </body>
+</html>
