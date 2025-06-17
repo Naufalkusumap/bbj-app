@@ -16,7 +16,6 @@ import {
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
-import { Picker } from "@react-native-picker/picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { MaterialIcons } from "@expo/vector-icons";
 
@@ -29,89 +28,56 @@ const AddScreen = () => {
   // Pilih komponen peta sesuai platform
   const MapComponent = Platform.OS === "web" ? MapSet : MapSetMobile;
 
-  // State untuk menyimpan input dari pengguna
-  const [waktu, setWaktu] = useState(new Date());
-  const [show, setShow] = useState(false);
-  const [koordinat, setKoordinat] = useState("");
-  const [namaPembagi, setNamaPembagi] = useState("");
-  const [nomorPembagi, setNomorPembagi] = useState("");
-  const [namaKegiatan, setNamaKegiatan] = useState("");
-  const [namaMakanan, setNamaMakanan] = useState("");
-  const [jenisMakanan, setJenisMakanan] = useState("");
-  const [tipeMakanan, setTipeMakanan] = useState("");
-  const [bahanMakanan, setBahanMakanan] = useState("");
-  const [modalJenisMakananVisible, setModalJenisMakananVisible] =
-    useState(false);
-  const [modalTipeMakananVisible, setModalTipeMakananVisible] = useState(false);
-  const [modalBahanMakananVisible, setModalBahanMakananVisible] =
-    useState(false);
-  const [jumlahMakanan, setJumlahMakanan] = useState(0);
-  const [keterangan, setKeterangan] = useState("");
-  const [waktuKadaluwarsa, setWaktuKadaluwarsa] = useState(new Date());
-  const [makananDiambil, setMakananDiambil] = useState("");
-  const [showKadaluwarsaPicker, setShowKadaluwarsaPicker] = useState(false); // Mengontrol visibilitas DateTimePicker
-  const [wadahMakanan, setWadahMakanan] = useState("");
-  const [modalWadahMakananVisible, setModalWadahMakananVisible] =
-    useState(false);
-  const [waktuPick, setWaktuPick] = useState(new Date());
+  // State untuk form data dengan date dan time terpisah
+  const [formData, setFormData] = useState({
+    // Waktu pembagian - terpisah
+    waktuDate: new Date(),
+    waktuTime: new Date(),
+    
+    koordinat: "",
+    namaPembagi: "",
+    nomorPembagi: "",
+    namaKegiatan: "",
+    namaMakanan: "",
+    jenisMakanan: "",
+    tipeMakanan: "",
+    bahanMakanan: "",
+    jumlahMakanan: 0,
+    keterangan: "",
+    
+    // Waktu kadaluwarsa - terpisah
+    waktuKadaluwarsaDate: new Date(),
+    waktuKadaluwarsaTime: new Date(),
+    
+    makananDiambil: "",
+    wadahMakanan: "",
+    
+    // Waktu pick - terpisah
+    waktuPickDate: new Date(),
+    waktuPickTime: new Date(),
+  });
 
-  // Image state
+  // State untuk UI controls
+  const [modals, setModals] = useState({
+    jenisMakanan: false,
+    tipeMakanan: false,
+    bahanMakanan: false,
+    wadahMakanan: false,
+  });
+
+  const [datePickers, setDatePickers] = useState({
+    waktuDate: false,
+    waktuTime: false,
+    waktuKadaluwarsaDate: false,
+    waktuKadaluwarsaTime: false,
+    waktuPickDate: false,
+    waktuPickTime: false,
+  });
+
   const [imageUri, setImageUri] = useState(null);
-
-  // Loading state
   const [loading, setLoading] = useState(false);
 
-  // Date picker states
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showExpireDatePicker, setShowExpireDatePicker] = useState(false);
-
-  // Get permission for camera and gallery
-  useEffect(() => {
-    (async () => {
-      const { status } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert(
-          "Permission Needed",
-          "Sorry, we need camera roll permissions to make this work!"
-        );
-      }
-    })();
-  }, []);
-
-  // Function to pick an image from gallery
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      setImageUri(result.assets[0].uri);
-    }
-  };
-
-  // Handle date picker
-  const onDateChange = (event, selectedDate) => {
-    setShowDatePicker(false);
-    if (selectedDate) {
-      const formattedDate = selectedDate.toISOString().split("T")[0];
-      setWaktu(formattedDate);
-    }
-  };
-
-  // Handle expire date picker
-  const onExpireDateChange = (event, selectedDate) => {
-    setShowExpireDatePicker(false);
-    if (selectedDate) {
-      const formattedDate = selectedDate.toISOString().split("T")[0];
-      setWaktuKadaluwarsa(formattedDate);
-    }
-  };
-
-  // Daftar jenis makanan untuk dipilih
+  // Data options
   const foodTypes = [
     { label: "Bahan Makanan (Mentah)", value: "Bahan Makanan" },
     { label: "Makanan Matang", value: "Makanan Matang" },
@@ -136,213 +102,236 @@ const AddScreen = () => {
     { label: "Tidak ada wadah makanan", value: "Tidak" },
   ];
 
-  // Fungsi untuk menutup modal Jenis Makanan
-  const closeModalJenisMakanan = () => {
-    setModalJenisMakananVisible(false);
+  // Get permission for camera and gallery
+  useEffect(() => {
+    const getPermissions = async () => {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission Needed",
+          "Sorry, we need camera roll permissions to make this work!"
+        );
+      }
+    };
+    getPermissions();
+  }, []);
+
+  // Generic function untuk update form data
+  const updateFormData = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  // Fungsi untuk menutup modal Tipe Makanan
-  const closeModalTipeMakanan = () => {
-    setModalTipeMakananVisible(false);
+  // Generic function untuk toggle modal
+  const toggleModal = (modalName, isOpen) => {
+    setModals(prev => ({ ...prev, [modalName]: isOpen }));
   };
 
-  // Fungsi untuk menutup modal Tipe Makanan
-  const closeModalBahanMakanan = () => {
-    setModalBahanMakananVisible(false);
+  // Generic function untuk toggle date picker
+  const toggleDatePicker = (pickerName, isOpen) => {
+    setDatePickers(prev => ({ ...prev, [pickerName]: isOpen }));
   };
 
-  // Fungsi untuk menutup modal Tipe Makanan
-  const closeModalWadahMakanan = () => {
-    setModalWadahMakananVisible(false);
+  // Function untuk handle date picker change
+  const handleDateChange = (pickerType) => (event, selectedDate) => {
+    // Tutup picker terlebih dahulu
+    toggleDatePicker(pickerType, false);
+    
+    // Jika user tidak dismiss dan ada tanggal yang dipilih
+    if (event?.type !== 'dismissed' && selectedDate) {
+      updateFormData(pickerType, selectedDate);
+    }
   };
 
-  // Fungsi untuk memilih jenis makanan
-  const handleSelectFoodTypes = (value) => {
-    setJenisMakanan(value);
-    setModalJenisMakananVisible(false); // Tutup modal setelah memilih
+  // Function untuk menggabungkan date dan time
+  const combineDateTime = (dateValue, timeValue) => {
+    if (!dateValue || !timeValue) return null;
+    
+    const combined = new Date(dateValue);
+    combined.setHours(timeValue.getHours());
+    combined.setMinutes(timeValue.getMinutes());
+    combined.setSeconds(0);
+    combined.setMilliseconds(0);
+    
+    return combined;
   };
 
-  // Fungsi untuk memilih tipe makanan
-  const handleSelectFoodStyles = (value) => {
-    setTipeMakanan(value);
-    setModalTipeMakananVisible(false); // Tutup modal setelah memilih
+  // Function untuk format tanggal untuk display
+  const formatDate = (date) => {
+    if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
+      return "Pilih tanggal";
+    }
+    
+    try {
+      return date.toLocaleDateString("id-ID", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    } catch (error) {
+      console.warn('Error formatting date:', error);
+      return "Pilih tanggal";
+    }
   };
 
-  // Fungsi untuk memilih bahan makanan
-  const handleSelectFoodComponents = (value) => {
-    setBahanMakanan(value);
-    setModalBahanMakananVisible(false); // Tutup modal setelah memilih
+  // Function untuk format waktu untuk display
+  const formatTime = (time) => {
+    if (!time || !(time instanceof Date) || isNaN(time.getTime())) {
+      return "Pilih waktu";
+    }
+    
+    try {
+      return time.toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch (error) {
+      console.warn('Error formatting time:', error);
+      return "Pilih waktu";
+    }
   };
 
-  // Fungsi untuk memilih bahan makanan
-  const handleSelectFoodWadah = (value) => {
-    setWadahMakanan(value);
-    setModalWadahMakananVisible(false); // Tutup modal setelah memilih
+  // Function untuk pick image
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setImageUri(result.assets[0].uri);
+    }
   };
 
-  // Fungsi untuk menambah jumlah makanan
-  const handleIncrease = () => setJumlahMakanan(jumlahMakanan + 1);
-  const handleDecrease = () => {
-    if (jumlahMakanan > 0) setJumlahMakanan(jumlahMakanan - 1);
+  // Function untuk handle selection dari modal
+  const handleModalSelection = (modalType, field, value) => {
+    updateFormData(field, value);
+    toggleModal(modalType, false);
   };
 
-  const onChange = (event, selectedDate) => {
-    const currentDate = selectedDate || waktu; // Jika tidak ada tanggal yang dipilih, gunakan tanggal yang sudah ada
-    setShow(false);
-    setWaktu(currentDate); // Menyimpan nilai waktu yang dipilih
+  // Function untuk increment/decrement jumlah makanan
+  const handleQuantityChange = (type) => {
+    if (type === "increase") {
+      updateFormData("jumlahMakanan", formData.jumlahMakanan + 1);
+    } else if (type === "decrease" && formData.jumlahMakanan > 0) {
+      updateFormData("jumlahMakanan", formData.jumlahMakanan - 1);
+    }
   };
 
-  // Fungsi untuk mengirim data ke server
-  const handleSubmit = async () => {
-    // Validation
-    if (!waktu) {
-      Alert.alert("Error", "Waktu harus diisi!");
-      return;
+  // Validation function
+  const validateForm = () => {
+    const requiredFields = [
+      { field: "waktuDate", message: "Tanggal pembagian harus diisi!" },
+      { field: "waktuTime", message: "Waktu pembagian harus diisi!" },
+      { field: "koordinat", message: "Koordinat harus diisi!" },
+      { field: "namaPembagi", message: "Nama pembagi harus diisi!" },
+      { field: "nomorPembagi", message: "Nomor pembagi harus diisi!" },
+      { field: "namaKegiatan", message: "Nama kegiatan harus diisi!" },
+      { field: "namaMakanan", message: "Nama makanan harus diisi!" },
+      { field: "jenisMakanan", message: "Jenis makanan harus diisi!" },
+      { field: "jumlahMakanan", message: "Jumlah makanan harus diisi!" },
+      { field: "keterangan", message: "Keterangan harus diisi!" },
+      { field: "waktuKadaluwarsaDate", message: "Tanggal kadaluwarsa harus diisi!" },
+      { field: "waktuKadaluwarsaTime", message: "Waktu kadaluwarsa harus diisi!" },
+    ];
+
+    for (const { field, message } of requiredFields) {
+      const value = formData[field];
+      if (!value || (field === "jumlahMakanan" && value <= 0)) {
+        Alert.alert("Error", message);
+        return false;
+      }
     }
-    if (!koordinat) {
-      Alert.alert("Error", "Koordinat harus diisi!");
-      return;
-    }
-    if (!namaPembagi) {
-      Alert.alert("Error", "Nama pembagi harus diisi!");
-      return;
-    }
-    if (!nomorPembagi) {
-      Alert.alert("Error", "Nomor pembagi harus diisi!");
-      return;
-    }
-    if (!namaKegiatan) {
-      Alert.alert("Error", "Nama kegiatan harus diisi!");
-      return;
-    }
-    if (!namaMakanan) {
-      Alert.alert("Error", "Nama makanan harus diisi!");
-      return;
-    }
-    if (!jenisMakanan) {
-      Alert.alert("Error", "Jenis makanan harus diisi!");
-      return;
-    }
-    if (!jumlahMakanan) {
-      Alert.alert("Error", "Jumlah makanan harus diisi!");
-      return;
-    }
-    if (!keterangan) {
-      Alert.alert("Error", "Keterangan harus diisi!");
-      return;
-    }
-    if (!waktuKadaluwarsa) {
-      Alert.alert("Error", "Waktu kadaluwarsa harus diisi!");
-      return;
-    }
+
     if (!imageUri) {
       Alert.alert("Error", "Gambar makanan harus dipilih!");
-      return;
+      return false;
     }
+
+    return true;
+  };
+
+  // Function untuk submit form
+  const handleSubmit = async () => {
+    if (!validateForm()) return;
 
     console.log("Starting form submission...");
     setLoading(true);
 
     try {
-      console.log("Getting token...");
-      // Ambil token dari AsyncStorage
       const token = await AsyncStorage.getItem("token");
-
       if (!token) {
-        console.log("No token found");
         setLoading(false);
         Alert.alert("Error", "Anda harus login terlebih dahulu!");
         return;
       }
-      console.log("Token retrieved successfully");
 
-      // Create FormData object
-      const formData = new FormData();
+      // Gabungkan date dan time sebelum mengirim
+      const waktuCombined = combineDateTime(formData.waktuDate, formData.waktuTime);
+      const waktuKadaluwarsaCombined = combineDateTime(formData.waktuKadaluwarsaDate, formData.waktuKadaluwarsaTime);
+      const waktuPickCombined = combineDateTime(formData.waktuPickDate, formData.waktuPickTime);
 
-      // Add all text fields
-      formData.append("waktu", waktu);
-      formData.append("koordinat", koordinat);
-      formData.append("nama_pembagi", namaPembagi);
-      formData.append("nomor_pembagi", nomorPembagi);
-      formData.append("nama_kegiatan", namaKegiatan);
-      formData.append("nama_makanan", namaMakanan);
-      formData.append("jenis_makanan", jenisMakanan);
-      formData.append("jumlah_makanan", jumlahMakanan.toString());
-      formData.append("keterangan", keterangan);
-      formData.append("waktu_kadaluwarsa", waktuKadaluwarsa);
-
-      // Add optional fields if they exist
-      if (tipeMakanan) formData.append("tipe_makanan", tipeMakanan);
-      if (wadahMakanan) formData.append("wadah_makanan", wadahMakanan);
-      if (makananDiambil) formData.append("makanan_diambil", makananDiambil);
-
-      // Add the image
-      console.log("Preparing image for upload:", imageUri);
-
-      // Extract filename from URI
-      const imageUriParts = imageUri.split("/");
-      const imageName = imageUriParts[imageUriParts.length - 1];
-
-      // Determine mime type based on extension
-      let imageType = "image/jpeg"; // Default
-      if (imageName.toLowerCase().endsWith(".png")) {
-        imageType = "image/png";
-      } else if (
-        imageName.toLowerCase().endsWith(".jpg") ||
-        imageName.toLowerCase().endsWith(".jpeg")
-      ) {
-        imageType = "image/jpeg";
+      const formDataToSend = new FormData();
+      
+      // Add combined datetime fields
+      if (waktuCombined) {
+        formDataToSend.append('waktu', waktuCombined.toISOString());
+      }
+      if (waktuKadaluwarsaCombined) {
+        formDataToSend.append('waktuKadaluwarsa', waktuKadaluwarsaCombined.toISOString());
+      }
+      if (waktuPickCombined) {
+        formDataToSend.append('waktuPick', waktuPickCombined.toISOString());
       }
 
-      console.log(`Image name: ${imageName}, type: ${imageType}`);
+      // Add other form fields (skip the separate date/time fields)
+      const fieldsToSkip = [
+        'waktuDate', 'waktuTime', 
+        'waktuKadaluwarsaDate', 'waktuKadaluwarsaTime',
+        'waktuPickDate', 'waktuPickTime'
+      ];
 
-      formData.append("image", {
-        uri:
-          Platform.OS === "android"
-            ? imageUri
-            : imageUri.replace("file://", ""),
+      Object.entries(formData).forEach(([key, value]) => {
+        if (!fieldsToSkip.includes(key) && value !== "" && value !== null && value !== undefined) {
+          formDataToSend.append(key, value.toString());
+        }
+      });
+
+      // Add image
+      const imageUriParts = imageUri.split("/");
+      const imageName = imageUriParts[imageUriParts.length - 1];
+      const imageType = imageName.toLowerCase().endsWith(".png") ? "image/png" : "image/jpeg";
+
+      formDataToSend.append("image", {
+        uri: Platform.OS === "android" ? imageUri : imageUri.replace("file://", ""),
         name: imageName,
         type: imageType,
       });
 
-      console.log("FormData prepared, sending request...");
-
-      const apiUrl = "http://172.20.10.4:8000/food/share";
-      console.log("Sending request to:", apiUrl);
-
-      const response = await fetch(apiUrl, {
+      const response = await fetch("https://mobile-be.berbagibitesjogja.com/food/share", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
         },
-        body: formData,
+        body: formDataToSend,
       });
 
-      console.log("Response status:", response.status);
-
-      // Try to parse response as JSON but handle if it's not JSON
-      let data;
       const responseText = await response.text();
+      let data;
       try {
         data = JSON.parse(responseText);
-        console.log("Response data:", data);
       } catch (e) {
-        console.log("Response is not JSON:", responseText);
         data = { detail: "Received a non-JSON response" };
       }
 
       setLoading(false);
 
       if (response.ok) {
-        console.log("Request successful!");
         Alert.alert("Sukses", "Data berhasil dikirim!");
-        router.replace("/home"); // Navigasi ke home setelah sukses
+        router.replace("/home");
       } else {
-        console.log("Request failed with status:", response.status);
-        Alert.alert(
-          "Gagal",
-          data.detail || `Error ${response.status}: Gagal menambahkan data.`
-        );
+        Alert.alert("Gagal", data.detail || `Error ${response.status}: Gagal menambahkan data.`);
       }
     } catch (error) {
       console.error("Exception occurred:", error);
@@ -351,32 +340,128 @@ const AddScreen = () => {
     }
   };
 
+  // Component untuk render modal picker
+  const renderModalPicker = (modalType, title, data, field) => (
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={modals[modalType]}
+      onRequestClose={() => toggleModal(modalType, false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>{title}</Text>
+          <FlatList
+            data={data}
+            keyExtractor={(item) => item.value}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.modalItem}
+                onPress={() => handleModalSelection(modalType, field, item.value)}
+              >
+                <Text style={styles.modalItemText}>{item.label}</Text>
+              </TouchableOpacity>
+            )}
+          />
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={() => toggleModal(modalType, false)}
+          >
+            <Text style={styles.closeButtonText}>Tutup</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  // Component untuk render date picker button
+  const renderDatePickerButton = (pickerType, label, mode = "date") => (
+    <View style={styles.inputContainer}>
+      <Text style={styles.label}>{label}</Text>
+      <TouchableOpacity
+        style={styles.input}
+        onPress={() => toggleDatePicker(pickerType, true)}
+      >
+        <Text style={styles.pickerText}>
+          {mode === "date" ? formatDate(formData[pickerType]) : formatTime(formData[pickerType])}
+        </Text>
+      </TouchableOpacity>
+      {datePickers[pickerType] && Platform.OS !== 'web' && (
+        <DateTimePicker
+          testID={`dateTimePicker${pickerType}`}
+          value={formData[pickerType] || new Date()}
+          mode={mode}
+          is24Hour={true}
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          onChange={handleDateChange(pickerType)}
+          maximumDate={mode === 'date' && (pickerType.includes('Kadaluwarsa') || pickerType.includes('Pick')) ? new Date(2030, 11, 31) : undefined}
+          minimumDate={mode === 'date' && (pickerType.includes('Kadaluwarsa') || pickerType.includes('Pick')) ? new Date() : undefined}
+        />
+      )}
+      {datePickers[pickerType] && Platform.OS === 'web' && (
+        <input
+          type={mode === "date" ? "date" : "time"}
+          value={
+            mode === "date" 
+              ? formData[pickerType]?.toISOString().slice(0, 10) || ''
+              : formData[pickerType]?.toTimeString().slice(0, 5) || ''
+          }
+          onChange={(e) => {
+            let newDate;
+            if (mode === "date") {
+              newDate = new Date(e.target.value);
+            } else {
+              const [hours, minutes] = e.target.value.split(':');
+              newDate = new Date();
+              newDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+            }
+            
+            if (!isNaN(newDate.getTime())) {
+              updateFormData(pickerType, newDate);
+            }
+            toggleDatePicker(pickerType, false);
+          }}
+          style={{
+            padding: 12,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: '#ccc',
+            backgroundColor: '#fff',
+            marginTop: 8,
+          }}
+        />
+      )}
+    </View>
+  );
+
+  // Component untuk render pasangan date dan time
+  const renderDateTimePair = (baseName, label) => (
+    <View style={styles.dateTimeContainer}>
+      <Text style={styles.sectionLabel}>{label}</Text>
+      <View style={styles.dateTimeRow}>
+        <View style={styles.dateTimeHalf}>
+          {renderDatePickerButton(`${baseName}Date`, "Tanggal", "date")}
+        </View>
+        <View style={styles.dateTimeHalf}>
+          {renderDatePickerButton(`${baseName}Time`, "Waktu", "time")}
+        </View>
+      </View>
+    </View>
+  );
+
   return (
     <ScrollView style={styles.container}>
-      {/* Waktu Pembagian */}
-      <View style={styles.inputContainer}>
-        <Text style={styles.label}>Waktu Pembagian</Text>
+      {/* Date Time Pickers - Terpisah */}
+      {renderDateTimePair("waktu", "Waktu Pembagian")}
 
-        <DateTimePicker
-          testID="dateTimePicker"
-          value={waktu}
-          mode="datetime"
-          is24Hour={true}
-          display="default"
-          onChange={onChange}
-          // timeZoneOffsetInMinutes={420}
-          // timeZone="Asia/Jakarta"
-        />
-      </View>
-
-      {/* Koordinat Input Field */}
+      {/* Koordinat */}
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Koordinat</Text>
         <TextInput
           style={styles.input}
           placeholder="Pilih koordinat"
           placeholderTextColor="gray"
-          value={koordinat}
+          value={formData.koordinat}
           editable={false}
         />
       </View>
@@ -385,21 +470,20 @@ const AddScreen = () => {
       <View style={styles.mapContainer}>
         <MapComponent
           onMapClick={(lat, lng) => {
-            const formattedCoordinate = `${lat}, ${lng}`;
-            setKoordinat(formattedCoordinate);
+            updateFormData("koordinat", `${lat}, ${lng}`);
           }}
         />
       </View>
 
-      {/* Input lainnya */}
+      {/* Text Inputs */}
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Nama Pembagi Makanan</Text>
         <TextInput
           style={styles.input}
           placeholder="Masukkan nama pembagi makanan"
           placeholderTextColor="gray"
-          value={namaPembagi}
-          onChangeText={setNamaPembagi}
+          value={formData.namaPembagi}
+          onChangeText={(text) => updateFormData("namaPembagi", text)}
         />
       </View>
 
@@ -410,8 +494,8 @@ const AddScreen = () => {
           placeholder="Masukkan nomor pembagi makanan"
           placeholderTextColor="gray"
           keyboardType="phone-pad"
-          value={nomorPembagi}
-          onChangeText={setNomorPembagi}
+          value={formData.nomorPembagi}
+          onChangeText={(text) => updateFormData("nomorPembagi", text)}
         />
       </View>
 
@@ -421,8 +505,8 @@ const AddScreen = () => {
           style={styles.input}
           placeholder="Masukkan nama kegiatan"
           placeholderTextColor="gray"
-          value={namaKegiatan}
-          onChangeText={setNamaKegiatan}
+          value={formData.namaKegiatan}
+          onChangeText={(text) => updateFormData("namaKegiatan", text)}
         />
       </View>
 
@@ -432,158 +516,57 @@ const AddScreen = () => {
           style={styles.input}
           placeholder="Masukkan nama makanan"
           placeholderTextColor="gray"
-          value={namaMakanan}
-          onChangeText={setNamaMakanan}
+          value={formData.namaMakanan}
+          onChangeText={(text) => updateFormData("namaMakanan", text)}
         />
       </View>
 
-      {/* Tombol untuk membuka modal dropdown Jenis Makanan */}
+      {/* Modal Pickers */}
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Jenis Makanan</Text>
-
         <TouchableOpacity
           style={styles.input}
-          onPress={() => setModalJenisMakananVisible(true)} // Menampilkan modal untuk jenis makanan
+          onPress={() => toggleModal("jenisMakanan", true)}
         >
           <Text style={styles.pickerText}>
-            {jenisMakanan ? jenisMakanan : "Pilih jenis makanan"}
+            {formData.jenisMakanan || "Pilih jenis makanan"}
           </Text>
         </TouchableOpacity>
-
-        {/* Modal untuk memilih jenis makanan */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={modalJenisMakananVisible} // Hanya tampil jika modal jenis makanan aktif
-          onRequestClose={closeModalJenisMakanan} // Menutup modal jika pengguna menekan back
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Pilih Jenis Makanan</Text>
-              <FlatList
-                data={foodTypes}
-                keyExtractor={(item) => item.value}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.modalItem}
-                    onPress={() => handleSelectFoodTypes(item.value)} // Pilih jenis makanan
-                  >
-                    <Text style={styles.modalItemText}>{item.label}</Text>
-                  </TouchableOpacity>
-                )}
-              />
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={closeModalJenisMakanan}
-              >
-                <Text style={styles.closeButtonText}>Tutup</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
       </View>
 
-      {/* Tombol untuk membuka modal dropdown Tipe Makanan */}
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Tipe Makanan</Text>
-
         <TouchableOpacity
           style={styles.input}
-          onPress={() => setModalTipeMakananVisible(true)} // Menampilkan modal untuk tipe makanan
+          onPress={() => toggleModal("tipeMakanan", true)}
         >
           <Text style={styles.pickerText}>
-            {tipeMakanan ? tipeMakanan : "Pilih tipe makanan"}
+            {formData.tipeMakanan || "Pilih tipe makanan"}
           </Text>
         </TouchableOpacity>
-
-        {/* Modal untuk memilih Tipe makanan */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={modalTipeMakananVisible} // Hanya tampil jika modal tipe makanan aktif
-          onRequestClose={closeModalTipeMakanan} // Menutup modal jika pengguna menekan back
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Pilih Tipe Makanan</Text>
-              <FlatList
-                data={foodStyles}
-                keyExtractor={(item) => item.value}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.modalItem}
-                    onPress={() => handleSelectFoodStyles(item.value)} // Pilih tipe makanan
-                  >
-                    <Text style={styles.modalItemText}>{item.label}</Text>
-                  </TouchableOpacity>
-                )}
-              />
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={closeModalTipeMakanan}
-              >
-                <Text style={styles.closeButtonText}>Tutup</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
       </View>
 
-      {/* Tombol untuk membuka modal dropdown Bahan Makanan */}
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Bahan Makanan</Text>
-
         <TouchableOpacity
           style={styles.input}
-          onPress={() => setModalBahanMakananVisible(true)} // Menampilkan modal untuk tipe makanan
+          onPress={() => toggleModal("bahanMakanan", true)}
         >
           <Text style={styles.pickerText}>
-            {bahanMakanan ? bahanMakanan : "Pilih bahan makanan"}
+            {formData.bahanMakanan || "Pilih bahan makanan"}
           </Text>
         </TouchableOpacity>
-
-        {/* Modal untuk memilih Bahan makanan */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={modalBahanMakananVisible} // Hanya tampil jika modal tipe makanan aktif
-          onRequestClose={closeModalBahanMakanan} // Menutup modal jika pengguna menekan back
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Pilih Bahan Makanan</Text>
-              <FlatList
-                data={foodComponents}
-                keyExtractor={(item) => item.value}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.modalItem}
-                    onPress={() => handleSelectFoodComponents(item.value)} // Pilih tipe makanan
-                  >
-                    <Text style={styles.modalItemText}>{item.label}</Text>
-                  </TouchableOpacity>
-                )}
-              />
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={closeModalBahanMakanan}
-              >
-                <Text style={styles.closeButtonText}>Tutup</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
       </View>
 
       {/* Jumlah Makanan */}
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Jumlah Makanan</Text>
         <View style={styles.jumlahContainer}>
-          <TouchableOpacity onPress={handleDecrease}>
+          <TouchableOpacity onPress={() => handleQuantityChange("decrease")}>
             <MaterialIcons name="remove" size={24} color="#D32F2F" />
           </TouchableOpacity>
-          <Text style={styles.jumlahText}>{jumlahMakanan}</Text>
-          <TouchableOpacity onPress={handleIncrease}>
+          <Text style={styles.jumlahText}>{formData.jumlahMakanan}</Text>
+          <TouchableOpacity onPress={() => handleQuantityChange("increase")}>
             <MaterialIcons name="add" size={24} color="#D32F2F" />
           </TouchableOpacity>
         </View>
@@ -597,72 +580,30 @@ const AddScreen = () => {
           multiline
           placeholder="Masukkan keterangan"
           placeholderTextColor="gray"
-          value={keterangan}
-          onChangeText={setKeterangan}
+          value={formData.keterangan}
+          onChangeText={(text) => updateFormData("keterangan", text)}
         />
       </View>
 
-      <View style={styles.inputContainer}>
-        <Text style={styles.label}>Waktu Kadaluwarsa</Text>
-        <DateTimePicker
-          testID="dateTimePickerKadaluwarsa"
-          value={waktuKadaluwarsa}
-          mode="datetime"
-          is24Hour={true}
-          display="default"
-          onChange={onChange}
-        />
-      </View>
+      {/* Date Time Pickers - Waktu Kadaluwarsa */}
+      {renderDateTimePair("waktuKadaluwarsa", "Waktu Kadaluwarsa")}
 
-      {/* Tombol untuk membuka modal dropdown Wadah Makanan */}
+      {/* Wadah Makanan */}
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Ketersediaan Wadah Makanan</Text>
-
         <TouchableOpacity
           style={styles.input}
-          onPress={() => setModalWadahMakananVisible(true)} // Menampilkan modal untuk jenis makanan
+          onPress={() => toggleModal("wadahMakanan", true)}
         >
           <Text style={styles.pickerText}>
-            {wadahMakanan ? wadahMakanan : "Pilih Wadah makanan"}
+            {formData.wadahMakanan || "Pilih wadah makanan"}
           </Text>
         </TouchableOpacity>
-
-        {/* Modal untuk memilih jenis makanan */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={modalWadahMakananVisible} // Hanya tampil jika modal jenis makanan aktif
-          onRequestClose={closeModalWadahMakanan} // Menutup modal jika pengguna menekan back
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Ketersediaan Wadah Makanan</Text>
-              <FlatList
-                data={foodWadah}
-                keyExtractor={(item) => item.value}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.modalItem}
-                    onPress={() => handleSelectFoodWadah(item.value)} // Pilih jenis makanan
-                  >
-                    <Text style={styles.modalItemText}>{item.label}</Text>
-                  </TouchableOpacity>
-                )}
-              />
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={closeModalJenisMakanan}
-              >
-                <Text style={styles.closeButtonText}>Tutup</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
       </View>
 
       {/* Image picker */}
-      <View style={styles.formGroup}>
-        <Text style={styles.modalItemText}>Foto Makanan</Text>
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>Foto Makanan</Text>
         <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
           {imageUri ? (
             <Image source={{ uri: imageUri }} style={styles.imagePreview} />
@@ -672,20 +613,14 @@ const AddScreen = () => {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.inputContainer}>
-        <Text style={styles.label}>Makanan Sebaiknya diambil pada</Text>
+      {/* Waktu Pick */}
+      {renderDateTimePair("waktuPick", "Makanan Sebaiknya diambil pada")}
 
-        <DateTimePicker
-          testID="dateTimePicker"
-          value={waktuPick}
-          mode="datetime"
-          is24Hour={true}
-          display="default"
-          onChange={onChange}
-          // timeZoneOffsetInMinutes={420}
-          // timeZone="Asia/Jakarta"
-        />
-      </View>
+      {/* Modals */}
+      {renderModalPicker("jenisMakanan", "Pilih Jenis Makanan", foodTypes, "jenisMakanan")}
+      {renderModalPicker("tipeMakanan", "Pilih Tipe Makanan", foodStyles, "tipeMakanan")}
+      {renderModalPicker("bahanMakanan", "Pilih Bahan Makanan", foodComponents, "bahanMakanan")}
+      {renderModalPicker("wadahMakanan", "Ketersediaan Wadah Makanan", foodWadah, "wadahMakanan")}
 
       {/* Submit Button */}
       <TouchableOpacity
@@ -703,127 +638,149 @@ const AddScreen = () => {
   );
 };
 
-export default AddScreen;
-
+// Tambahkan styles untuk komponen baru
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f6f7",
-    padding: 20,
-  },
-  mapContainer: {
-    height: 300,
-    marginBottom: 20,
-    backgroundColor: "#ddd",
+    backgroundColor: '#f5f5f5',
+    padding: 16,
   },
   inputContainer: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    color: "#333",
-    marginBottom: 5,
-  },
-  input: {
-    backgroundColor: "#fff",
-    padding: 12,
-    borderRadius: 8,
-    fontSize: 14,
-    borderWidth: 1,
-    borderColor: "#ccc",
-  },
-  jumlahContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  jumlahText: {
-    fontSize: 16,
-    color: "#333",
-  },
-  submitButton: {
-    backgroundColor: "#F9A826",
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  submitButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
+    marginBottom: 16,
   },
   label: {
     fontSize: 16,
-    color: "#333",
+    fontWeight: 'bold',
     marginBottom: 8,
+    color: '#333',
+  },
+  sectionLabel: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: '#D32F2F',
   },
   input: {
-    backgroundColor: "#fff",
-    padding: 12,
-    borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#ccc",
-    alignItems: "center",
-    justifyContent: "center",
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#fff',
+    fontSize: 16,
   },
   pickerText: {
+    color: '#333',
     fontSize: 16,
-    color: "#333",
+  },
+  dateTimeContainer: {
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  dateTimeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  dateTimeHalf: {
+    flex: 0.48,
+  },
+  mapContainer: {
+    height: 200,
+    marginBottom: 16,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  jumlahContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    paddingVertical: 12,
+  },
+  jumlahText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginHorizontal: 20,
+    color: '#333',
+  },
+  imagePicker: {
+    borderWidth: 2,
+    borderColor: '#ddd',
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    padding: 20,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  imagePickerText: {
+    color: '#666',
+    fontSize: 16,
+  },
+  imagePreview: {
+    width: 200,
+    height: 150,
+    borderRadius: 8,
+  },
+  submitButton: {
+    backgroundColor: '#D32F2F',
+    paddingVertical: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  submitButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   modalOverlay: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)", // Dark background for modal
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
+    borderRadius: 12,
     padding: 20,
-    borderRadius: 8,
-    width: "80%",
+    width: '80%',
+    maxHeight: '70%',
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 10,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+    color: '#333',
   },
   modalItem: {
-    padding: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#ddd",
+    borderBottomColor: '#eee',
   },
   modalItemText: {
     fontSize: 16,
-    color: "#333",
+    color: '#333',
   },
   closeButton: {
-    marginTop: 10,
-    padding: 10,
-    backgroundColor: "#F9A826",
+    backgroundColor: '#D32F2F',
+    paddingVertical: 12,
     borderRadius: 8,
-    alignItems: "center",
+    alignItems: 'center',
+    marginTop: 16,
   },
   closeButtonText: {
-    color: "#fff",
+    color: '#fff',
     fontSize: 16,
-    fontWeight: "bold",
-  },
-  imagePicker: {
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    height: 200,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  imagePickerText: {
-    color: "#666",
-  },
-  imagePreview: {
-    width: "90%",
-    height: "85%",
-    borderRadius: 8,
+    fontWeight: 'bold',
   },
 });
+
+export default AddScreen;

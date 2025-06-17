@@ -6,7 +6,7 @@ const MyMapMobile = () => (
   <View style={styles.container}>
     <WebView
       source={{
-        uri: "https://mobile-be.berbagibitesjogja.com/map-view",
+        uri: "https://mobile-be.berbagibitesjogja.com/map-view/",
       }}
     />
   </View>

@@ -22,7 +22,7 @@ const FoodListScreen = () => {
     // Fetch data from the API
     const fetchFoodData = async () => {
       try {
-        const response = await fetch("https://mobile-be.berbagibitesjogja.com/announcements/");
+        const response = await fetch("https://mobile-be.berbagibitesjogja.com/announcements");
         if (!response.ok) {
           throw new Error("Failed to fetch announcements");
         }

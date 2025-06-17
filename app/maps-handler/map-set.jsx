@@ -26,7 +26,7 @@ const MapSet = () => {
   return (
     <iframe
       title="Leaflet Map"
-      src="https://map-view-bagi-makan-app.vercel.app/map-set"
+      src="https://mobile-be.berbagibitesjogja.com/map-view"
       // source={require("../../assets/leafletMap.html")}
       style={{ width: "100%", height: "100%", border: "none" }}
     />
